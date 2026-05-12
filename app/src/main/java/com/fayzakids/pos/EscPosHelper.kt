@@ -21,7 +21,7 @@ object EscPosHelper {
     private val ESC_BOLD_ON      = byteArrayOf(0x1B, 0x45, 0x01)
     private val ESC_BOLD_OFF     = byteArrayOf(0x1B, 0x45, 0x00)
     private val ESC_DOUBLE_SIZE  = byteArrayOf(0x1D, 0x21, 0x11)
-    private val ESC_DOUBLE_H     = byteArrayOf(0x1D, 0x21, 0x10)  // double height only
+    private val ESC_DOUBLE_H     = byteArrayOf(0x1D, 0x21, 0x10)
     private val ESC_NORMAL_SIZE  = byteArrayOf(0x1D, 0x21, 0x00)
     private val ESC_CUT          = byteArrayOf(0x1D, 0x56, 0x42, 0x00)
     private val LF               = byteArrayOf(0x0A)
@@ -40,6 +40,22 @@ object EscPosHelper {
     private fun rupiah(n: Double): String {
         val fmt = NumberFormat.getNumberInstance(Locale("id", "ID"))
         return "Rp" + fmt.format(n.toLong())
+    }
+
+    // ── Helper: baca JSON dengan fallback ke key alternatif ───────────────
+    private fun JSONObject.str(vararg keys: String, default: String = ""): String {
+        for (k in keys) {
+            val v = optString(k, "")
+            if (v.isNotBlank()) return v
+        }
+        return default
+    }
+
+    private fun JSONObject.dbl(vararg keys: String, default: Double = 0.0): Double {
+        for (k in keys) {
+            if (has(k)) return optDouble(k, default)
+        }
+        return default
     }
 
     // ── Logo -> ESC/POS raster (GS v 0) ─────────────────────────────────
@@ -69,7 +85,6 @@ object EscPosHelper {
 
         val buf = mutableListOf<Byte>()
         ESC_ALIGN_CENTER.forEach { buf.add(it) }
-        // GS v 0 normal density
         listOf(0x1D, 0x76, 0x30, 0x00).forEach { buf.add(it.toByte()) }
         buf.add((bytesPerRow and 0xFF).toByte()); buf.add((bytesPerRow shr 8).toByte())
         buf.add((h and 0xFF).toByte());            buf.add((h shr 8).toByte())
@@ -85,24 +100,41 @@ object EscPosHelper {
     ): ByteArray {
         val obj = try { JSONObject(json) } catch (_: Exception) { JSONObject() }
 
-        // Android settings override web values ketika tidak kosong
-        val namaApp = settings.storeName.ifBlank { obj.optString("appName", "POS SYSTEM") }
-        val header  = settings.header.ifBlank     { obj.optString("header",  "") }
-        val footer  = settings.footer.ifBlank     { obj.optString("footer",  "Terima kasih!") }
+        // Key mapping: Android settings > toko_nama > appName > default
+        val namaApp = settings.storeName.ifBlank {
+            obj.str("toko_nama", "appName", default = "POS SYSTEM")
+        }
 
-        val faktur  = obj.optString("faktur",  "-")
-        val tanggal = obj.optString("tanggal", "")
-        val waktu   = obj.optString("waktu",   "")
-        val kasir   = obj.optString("kasir",   "")
-        val member  = obj.optString("member",  "")
-        val metode  = obj.optString("metode",  "Tunai")
+        // Header: gabungkan print_header + alamat + telp jika tersedia
+        val headerAndroid = settings.header
+        val headerWeb = buildString {
+            val ph   = obj.str("print_header", "header")
+            val addr = obj.str("toko_alamat")
+            val telp = obj.str("toko_telp")
+            if (ph.isNotBlank())   appendLine(ph)
+            if (addr.isNotBlank()) appendLine(addr)
+            if (telp.isNotBlank()) append(telp)
+        }.trim()
+        val header = headerAndroid.ifBlank { headerWeb }
+
+        val footer = settings.footer.ifBlank {
+            obj.str("print_footer", "footer", default = "Terima kasih!")
+        }
+
+        // Field transaksi — dukung key lama & baru
+        val faktur  = obj.str("faktur",   default = "-")
+        val tanggal = obj.str("tanggal",  default = "")
+        val waktu   = obj.str("waktu",    default = "")
+        val kasir   = obj.str("operator", "kasir")   // operator (baru) atau kasir (lama)
+        val member  = obj.str("pelanggan","member")  // pelanggan (baru) atau member (lama)
+        val metode  = obj.str("metode",   default = "Tunai")
         val items   = obj.optJSONArray("items")
-        val subtotal= obj.optDouble("subtotal", 0.0)
-        val diskon  = obj.optDouble("diskon",   0.0)
-        val total   = obj.optDouble("total",    0.0)
-        val bayar   = obj.optDouble("bayar",    0.0)
-        val kembali = obj.optDouble("kembali",  0.0)
-        val poin    = obj.optInt("poinEarned",  0)
+        val subtotal= obj.dbl("subtotal")
+        val diskon  = obj.dbl("diskon")
+        val total   = obj.dbl("total")
+        val bayar   = obj.dbl("bayar")
+        val kembali = obj.dbl("kembali")
+        val poin    = obj.optInt("poinEarned", 0)
         val bigItem = settings.fontSize == 1
 
         val buf = mutableListOf<Byte>()
@@ -127,8 +159,8 @@ object EscPosHelper {
         add(cols("No Faktur", faktur))
         val tgl = if (waktu.isNotBlank()) "$tanggal $waktu" else tanggal
         add(cols("Tanggal",  tgl))
-        if (kasir.isNotBlank())  add(cols("Kasir",  kasir))
-        if (member.isNotBlank()) add(cols("Member", member))
+        if (kasir.isNotBlank())  add(cols("Kasir",   kasir))
+        if (member.isNotBlank()) add(cols("Member",  member))
         add(sep())
 
         // Items
@@ -153,7 +185,8 @@ object EscPosHelper {
         add(ESC_BOLD_ON)
         add(cols("TOTAL", rupiah(total)))
         add(ESC_BOLD_OFF)
-        add(cols("Bayar ($metode)", rupiah(bayar)))
+        val metodeLabel = metode.replace("_", " ").replaceFirstChar { it.uppercase() }
+        add(cols("Bayar ($metodeLabel)", rupiah(bayar)))
         if (kembali > 0) add(cols("Kembali", rupiah(kembali)))
 
         if (poin > 0) {
@@ -192,6 +225,8 @@ object EscPosHelper {
         add(line("TEST PRINT"))
         add(ESC_NORMAL_SIZE); add(ESC_BOLD_OFF)
         add(line(storeName))
+        if (settings.header.isNotBlank())
+            settings.header.split("\n").forEach { add(line(it.trim())) }
         add(sep())
         add(ESC_ALIGN_LEFT)
         add(line("Printer OK!"))
@@ -213,7 +248,7 @@ object EscPosHelper {
         add(cols("Kembali", "Rp5.000"))
         add(sep())
         add(ESC_ALIGN_CENTER)
-        if (footer.isNotBlank()) footer.split("\n").forEach { add(line(it.trim())) }
+        footer.split("\n").forEach { add(line(it.trim())) }
         add(LF); add(LF); add(LF)
         add(ESC_CUT)
 
