@@ -1,6 +1,8 @@
 plugins {
     id 'com.android.application'
     id 'org.jetbrains.kotlin.android'
+    // Uncomment baris di bawah setelah menambahkan google-services.json (untuk FCM)
+    // id 'com.google.gms.google-services'
 }
 
 android {
@@ -34,4 +36,8 @@ dependencies {
     implementation 'androidx.appcompat:appcompat:1.6.1'
     implementation 'com.google.android.material:material:1.11.0'
     implementation 'org.json:json:20231013'
+
+    // FCM push notification (opsional — aktifkan setelah setup Firebase)
+    // implementation platform('com.google.firebase:firebase-bom:32.7.0')
+    // implementation 'com.google.firebase:firebase-messaging-ktx'
 }

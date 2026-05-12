@@ -12,6 +12,8 @@
     <!-- Internet -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+    <!-- Notifikasi (Android 13+) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
 
     <uses-feature android:name="android.hardware.bluetooth" android:required="false"/>
 
@@ -36,12 +38,19 @@
             </intent-filter>
         </activity>
 
-        <!-- Printer settings activity -->
+        <!-- Printer device list -->
         <activity
             android:name=".PrinterActivity"
             android:exported="false"
             android:screenOrientation="portrait"
             android:parentActivityName=".MainActivity" />
+
+        <!-- Printer receipt settings -->
+        <activity
+            android:name=".PrinterSettingsActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:parentActivityName=".PrinterActivity" />
 
     </application>
 

@@ -1,5 +1,6 @@
 package com.fayzakids.pos
 
+import android.content.Context
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
 
@@ -9,35 +10,29 @@ import android.webkit.WebView
  */
 class WebAppInterface(
     private val webView: WebView,
+    private val context: Context,
     private val onStatusChange: ((connected: Boolean, name: String) -> Unit)? = null
 ) {
 
-    /** Cek apakah printer sedang terhubung */
     @JavascriptInterface
     fun isConnected(): Boolean = BluetoothPrinterManager.isConnected
 
-    /** Nama device yang sedang terhubung */
     @JavascriptInterface
-    fun getStatus(): String {
-        return if (BluetoothPrinterManager.isConnected)
+    fun getStatus(): String =
+        if (BluetoothPrinterManager.isConnected)
             "connected:${BluetoothPrinterManager.connectedDeviceName}"
         else "disconnected"
-    }
 
-    /** Apakah berjalan di dalam Android app */
     @JavascriptInterface
     fun isAndroidApp(): Boolean = true
 
-    /**
-     * Cetak struk dari JSON.
-     * JSON format sama persis dengan yang dikirim printer.js.
-     * Dipanggil dari background thread (JavascriptInterface runs on a separate thread).
-     */
+    /** Cetak struk dari JSON */
     @JavascriptInterface
     fun printReceipt(json: String) {
         Thread {
             try {
-                val bytes = EscPosHelper.buildReceipt(json)
+                val settings  = PrinterSettings.load(context)
+                val bytes     = EscPosHelper.buildReceipt(json, settings)
                 val (ok, msg) = BluetoothPrinterManager.print(bytes)
                 notifyWeb(ok, msg)
             } catch (e: Exception) {
@@ -46,18 +41,30 @@ class WebAppInterface(
         }.start()
     }
 
-    /** Test print untuk verifikasi koneksi */
+    /** Test print */
     @JavascriptInterface
     fun testPrint() {
         Thread {
             try {
-                val bytes = EscPosHelper.buildTestPrint()
+                val settings  = PrinterSettings.load(context)
+                val bytes     = EscPosHelper.buildTestPrint(settings)
                 val (ok, msg) = BluetoothPrinterManager.print(bytes)
                 notifyWeb(ok, msg)
             } catch (e: Exception) {
                 notifyWeb(false, "Error: ${e.message}")
             }
         }.start()
+    }
+
+    /**
+     * Tampilkan notifikasi sistem Android.
+     * Dipanggil dari JavaScript setelah transaksi berhasil:
+     *   window.AndroidPrinter.showNotification("Transaksi Baru", "Total: Rp50.000")
+     */
+    @JavascriptInterface
+    fun showNotification(title: String, body: String) {
+        NotificationHelper.createChannel(context)
+        NotificationHelper.show(context, title, body)
     }
 
     private fun notifyWeb(ok: Boolean, msg: String) {

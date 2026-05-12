@@ -1,22 +1,29 @@
 package com.fayzakids.pos
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
 import android.webkit.*
 import android.widget.EditText
-import android.widget.ImageButton
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var webView: WebView
-    private lateinit var fabPrinter: ImageButton
+
+    private val notifPermLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { /* user pilih allow/deny, lanjut saja */ }
 
     companion object {
         const val PREFS_NAME   = "pos_prefs"
@@ -34,18 +41,12 @@ class MainActivity : AppCompatActivity() {
             title = "POS Fayzakids"
         }
 
-        webView    = findViewById(R.id.webView)
-        fabPrinter = findViewById(R.id.fab_printer)
+        webView = findViewById(R.id.webView)
 
+        NotificationHelper.createChannel(this)
+        requestNotificationPermission()
         setupWebView()
-        setupFab()
-
         loadServerUrl()
-    }
-
-    override fun onResume() {
-        super.onResume()
-        updateFabColor()
     }
 
     override fun onDestroy() {
@@ -77,27 +78,13 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // ── FAB ───────────────────────────────────────────────────────────────
-
-    private fun setupFab() {
-        updateFabColor()
-
-        fabPrinter.setOnClickListener {
-            openPrinterActivity()
+    private fun requestNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ActivityCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED) {
+                notifPermLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
         }
-
-        fabPrinter.setOnLongClickListener {
-            showUrlDialog()
-            true
-        }
-    }
-
-    private fun updateFabColor() {
-        val color = if (BluetoothPrinterManager.isConnected)
-            getColor(android.R.color.holo_green_dark)
-        else
-            0xFF7B1FA2.toInt()   // Material Purple 700
-        fabPrinter.setColorFilter(color)
     }
 
     private fun openPrinterActivity() {
@@ -168,9 +155,7 @@ class MainActivity : AppCompatActivity() {
         webView.webChromeClient = WebChromeClient()
 
         // Bridge baru — diakses dari JS sebagai window.AndroidPrinter
-        val bridge = WebAppInterface(webView) { connected, name ->
-            runOnUiThread { updateFabColor() }
-        }
+        val bridge = WebAppInterface(webView, this)
         webView.addJavascriptInterface(bridge, "AndroidPrinter")
 
         // Legacy bridge — window.AndroidBluetooth (backward compat)
@@ -204,7 +189,6 @@ class MainActivity : AppCompatActivity() {
         @JavascriptInterface
         fun disconnect() {
             BluetoothPrinterManager.disconnect()
-            runOnUiThread { updateFabColor() }
         }
     }
 }

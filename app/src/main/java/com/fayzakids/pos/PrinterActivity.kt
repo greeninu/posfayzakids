@@ -1,13 +1,12 @@
 package com.fayzakids.pos
 
-import android.Manifest
-import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.view.LayoutInflater
+import android.view.Menu
+import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
 import android.widget.*
@@ -16,17 +15,20 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import android.Manifest
+import android.bluetooth.BluetoothAdapter
+import android.content.pm.PackageManager
 
 class PrinterActivity : AppCompatActivity() {
 
-    private lateinit var tvStatus: TextView
-    private lateinit var tvDeviceName: TextView
+    private lateinit var tvStatus:    TextView
+    private lateinit var tvDeviceName:TextView
     private lateinit var btnDisconnect: Button
-    private lateinit var btnTestPrint: Button
-    private lateinit var btnEnableBt: Button
-    private lateinit var rvDevices: RecyclerView
-    private lateinit var tvNoDevices: TextView
-    private lateinit var progressBar: ProgressBar
+    private lateinit var btnTestPrint:  Button
+    private lateinit var btnEnableBt:   Button
+    private lateinit var rvDevices:     RecyclerView
+    private lateinit var tvNoDevices:   TextView
+    private lateinit var progressBar:   ProgressBar
 
     private val deviceAdapter = DeviceAdapter { device -> connectDevice(device) }
 
@@ -46,11 +48,10 @@ class PrinterActivity : AppCompatActivity() {
         setContentView(R.layout.activity_printer)
 
         supportActionBar?.apply {
-            title = "🖨️ Pengaturan Printer"
+            title = "🖨️ Printer Bluetooth"
             setDisplayHomeAsUpEnabled(true)
         }
 
-        // Bind views
         tvStatus     = findViewById(R.id.tv_status)
         tvDeviceName = findViewById(R.id.tv_device_name)
         btnDisconnect= findViewById(R.id.btn_disconnect)
@@ -77,8 +78,9 @@ class PrinterActivity : AppCompatActivity() {
             btnTestPrint.isEnabled = false
             btnTestPrint.text = "Mencetak..."
             Thread {
-                val bytes = EscPosHelper.buildTestPrint()
-                val (ok, msg) = BluetoothPrinterManager.print(bytes)
+                val settings = PrinterSettings.load(this)
+                val bytes    = EscPosHelper.buildTestPrint(settings)
+                val (ok, msg)= BluetoothPrinterManager.print(bytes)
                 runOnUiThread {
                     btnTestPrint.isEnabled = true
                     btnTestPrint.text = "🖨️ Test Print"
@@ -100,9 +102,26 @@ class PrinterActivity : AppCompatActivity() {
         updateStatusUI()
     }
 
-    override fun onSupportNavigateUp(): Boolean {
-        finish(); return true
+    override fun onSupportNavigateUp(): Boolean { finish(); return true }
+
+    // ── Menu ─────────────────────────────────────────────────────────────
+
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        menu.add(0, 1, 0, "⚙️ Pengaturan Struk")
+        return true
     }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        return when (item.itemId) {
+            1 -> {
+                startActivity(Intent(this, PrinterSettingsActivity::class.java))
+                true
+            }
+            else -> super.onOptionsItemSelected(item)
+        }
+    }
+
+    // ── BT helpers ───────────────────────────────────────────────────────
 
     private fun requestPermissionsAndLoad() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -112,10 +131,7 @@ class PrinterActivity : AppCompatActivity() {
             ).filter {
                 ActivityCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
             }
-            if (needed.isNotEmpty()) {
-                permissionLauncher.launch(needed.toTypedArray())
-                return
-            }
+            if (needed.isNotEmpty()) { permissionLauncher.launch(needed.toTypedArray()); return }
         }
         loadPairedDevices()
     }
@@ -130,7 +146,6 @@ class PrinterActivity : AppCompatActivity() {
             return
         }
         btnEnableBt.visibility = View.GONE
-
         progressBar.visibility = View.VISIBLE
         Thread {
             val devices = BluetoothPrinterManager.getPairedDevices(this)
@@ -152,7 +167,6 @@ class PrinterActivity : AppCompatActivity() {
     private fun connectDevice(device: BluetoothDevice) {
         progressBar.visibility = View.VISIBLE
         deviceAdapter.setConnecting(device.address)
-
         Thread {
             val (ok, msg) = BluetoothPrinterManager.connect(device)
             runOnUiThread {
@@ -167,17 +181,16 @@ class PrinterActivity : AppCompatActivity() {
 
     private fun updateStatusUI() {
         val connected = BluetoothPrinterManager.isConnected
-        val name = BluetoothPrinterManager.connectedDeviceName
-
+        val name      = BluetoothPrinterManager.connectedDeviceName
         if (connected) {
-            tvStatus.text     = "● TERHUBUNG"
+            tvStatus.text = "● TERHUBUNG"
             tvStatus.setTextColor(getColor(android.R.color.holo_green_dark))
             tvDeviceName.text = name
             tvDeviceName.visibility = View.VISIBLE
             btnDisconnect.isEnabled = true
             btnTestPrint.isEnabled  = true
         } else {
-            tvStatus.text     = "○ Tidak Terhubung"
+            tvStatus.text = "○ Tidak Terhubung"
             tvStatus.setTextColor(getColor(android.R.color.darker_gray))
             tvDeviceName.visibility = View.GONE
             btnDisconnect.isEnabled = false
@@ -186,31 +199,29 @@ class PrinterActivity : AppCompatActivity() {
     }
 
     // ── RecyclerView Adapter ──────────────────────────────────────────────
-    class DeviceAdapter(
-        private val onClick: (BluetoothDevice) -> Unit
-    ) : RecyclerView.Adapter<DeviceAdapter.VH>() {
+    class DeviceAdapter(private val onClick: (BluetoothDevice) -> Unit)
+        : RecyclerView.Adapter<DeviceAdapter.VH>() {
 
         private var devices = listOf<BluetoothDevice>()
         private var connectingAddress: String? = null
 
         fun setDevices(list: List<BluetoothDevice>) { devices = list; notifyDataSetChanged() }
-        fun setConnecting(addr: String) { connectingAddress = addr; notifyDataSetChanged() }
-        fun clearConnecting() { connectingAddress = null; notifyDataSetChanged() }
+        fun setConnecting(addr: String)  { connectingAddress = addr; notifyDataSetChanged() }
+        fun clearConnecting()             { connectingAddress = null; notifyDataSetChanged() }
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
-            val v = LayoutInflater.from(parent.context)
-                .inflate(R.layout.item_device, parent, false)
+            val v = LayoutInflater.from(parent.context).inflate(R.layout.item_device, parent, false)
             return VH(v)
         }
 
         override fun onBindViewHolder(h: VH, pos: Int) {
-            val dev = devices[pos]
+            val dev          = devices[pos]
             val isConnected  = BluetoothPrinterManager.isConnected &&
-                    BluetoothPrinterManager.connectedDeviceName == (dev.name ?: dev.address)
+                BluetoothPrinterManager.connectedDeviceName == (dev.name ?: dev.address)
             val isConnecting = connectingAddress == dev.address
 
-            h.tvName.text    = dev.name ?: "Unknown"
-            h.tvAddr.text    = dev.address
+            h.tvName.text = dev.name ?: "Unknown"
+            h.tvAddr.text = dev.address
             h.btnConnect.text = when {
                 isConnected  -> "✓ Terhubung"
                 isConnecting -> "Menghubungkan..."
@@ -222,17 +233,15 @@ class PrinterActivity : AppCompatActivity() {
                     if (isConnected) android.R.color.holo_green_dark else android.R.color.holo_purple
                 )
             )
-            h.btnConnect.setOnClickListener {
-                if (!isConnected) onClick(dev)
-            }
+            h.btnConnect.setOnClickListener { if (!isConnected) onClick(dev) }
         }
 
         override fun getItemCount() = devices.size
 
         class VH(v: View) : RecyclerView.ViewHolder(v) {
-            val tvName: TextView   = v.findViewById(R.id.tv_device_name)
-            val tvAddr: TextView   = v.findViewById(R.id.tv_device_addr)
-            val btnConnect: Button = v.findViewById(R.id.btn_connect)
+            val tvName:    TextView = v.findViewById(R.id.tv_device_name)
+            val tvAddr:    TextView = v.findViewById(R.id.tv_device_addr)
+            val btnConnect: Button  = v.findViewById(R.id.btn_connect)
         }
     }
 }

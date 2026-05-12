@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#F5F5F5">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="12dp">
+
+        <!-- ── LOGO ── -->
+        <TextView android:text="LOGO TOKO"
+            style="@style/SectionLabel" />
+
+        <LinearLayout style="@style/Card" android:orientation="vertical">
+
+            <LinearLayout android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+                <TextView android:layout_width="0dp" android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="Tampilkan Logo di Struk"
+                    android:textSize="14sp" />
+                <Switch android:id="@+id/sw_logo"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+            </LinearLayout>
+
+            <ImageView
+                android:id="@+id/img_logo_preview"
+                android:layout_width="120dp"
+                android:layout_height="60dp"
+                android:layout_marginTop="10dp"
+                android:layout_gravity="center_horizontal"
+                android:scaleType="fitCenter"
+                android:visibility="gone" />
+
+            <Button
+                android:id="@+id/btn_pick_logo"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="📷 Pilih Gambar Logo" />
+
+        </LinearLayout>
+
+        <!-- ── TEKS STRUK ── -->
+        <TextView android:text="TEKS STRUK"
+            style="@style/SectionLabel" />
+
+        <LinearLayout style="@style/Card" android:orientation="vertical">
+
+            <TextView android:text="Nama Toko" style="@style/FieldLabel" />
+            <EditText
+                android:id="@+id/et_store_name"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Kosong = pakai nama dari web"
+                android:inputType="text"
+                android:maxLines="1" />
+
+            <TextView android:text="Header (alamat, telp, dll)" style="@style/FieldLabel" />
+            <EditText
+                android:id="@+id/et_header"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Kosong = pakai header dari web"
+                android:inputType="textMultiLine"
+                android:minLines="3"
+                android:gravity="top"
+                android:lines="3" />
+
+            <TextView android:text="Footer (pesan penutup)" style="@style/FieldLabel" />
+            <EditText
+                android:id="@+id/et_footer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Kosong = pakai footer dari web"
+                android:inputType="textMultiLine"
+                android:minLines="2"
+                android:gravity="top"
+                android:lines="2" />
+
+        </LinearLayout>
+
+        <!-- ── UKURAN FONT ── -->
+        <TextView android:text="UKURAN FONT ITEM"
+            style="@style/SectionLabel" />
+
+        <LinearLayout style="@style/Card" android:orientation="vertical">
+
+            <RadioGroup android:id="@+id/rg_font_size"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <RadioButton android:id="@+id/rb_normal"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Normal (32 karakter/baris)"
+                    android:checked="true" />
+
+                <RadioButton android:id="@+id/rb_besar"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Besar (double height nama item)" />
+
+            </RadioGroup>
+
+        </LinearLayout>
+
+        <!-- ── SAVE ── -->
+        <Button
+            android:id="@+id/btn_save"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:layout_marginTop="16dp"
+            android:layout_marginBottom="16dp"
+            android:text="💾 Simpan Pengaturan"
+            android:textSize="16sp" />
+
+    </LinearLayout>
+</ScrollView>
