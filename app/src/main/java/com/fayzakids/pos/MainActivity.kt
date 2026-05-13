@@ -16,6 +16,7 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 
 class MainActivity : AppCompatActivity() {
 
@@ -24,6 +25,19 @@ class MainActivity : AppCompatActivity() {
     private val notifPermLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { /* user pilih allow/deny, lanjut saja */ }
+
+    private val cameraPermLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        // Jika ada WebView yang menunggu izin kamera, grant atau deny sekarang
+        pendingWebPermission?.let { req ->
+            if (granted) req.grant(req.resources) else req.deny()
+            pendingWebPermission = null
+        }
+    }
+
+    // Callback untuk WebView onPermissionRequest (kamera, mikrofon, dll)
+    private var pendingWebPermission: PermissionRequest? = null
 
     companion object {
         const val PREFS_NAME   = "pos_prefs"
@@ -45,6 +59,7 @@ class MainActivity : AppCompatActivity() {
 
         NotificationHelper.createChannel(this)
         requestNotificationPermission()
+        requestCameraPermission()
         setupWebView()
         loadServerUrl()
     }
@@ -84,6 +99,13 @@ class MainActivity : AppCompatActivity() {
                 != PackageManager.PERMISSION_GRANTED) {
                 notifPermLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
             }
+        }
+    }
+
+    private fun requestCameraPermission() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
+            != PackageManager.PERMISSION_GRANTED) {
+            cameraPermLauncher.launch(Manifest.permission.CAMERA)
         }
     }
 
@@ -152,7 +174,25 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
-        webView.webChromeClient = WebChromeClient()
+        webView.webChromeClient = object : WebChromeClient() {
+            // Izinkan WebView mengakses kamera (untuk scan barcode) dan mikrofon
+            override fun onPermissionRequest(request: PermissionRequest) {
+                runOnUiThread {
+                    val cameraGranted = ContextCompat.checkSelfPermission(
+                        this@MainActivity, Manifest.permission.CAMERA
+                    ) == PackageManager.PERMISSION_GRANTED
+
+                    if (cameraGranted) {
+                        // Grant semua resource yang diminta (camera, audio, dst)
+                        request.grant(request.resources)
+                    } else {
+                        // Minta izin dulu, simpan request agar bisa di-grant setelah approved
+                        pendingWebPermission = request
+                        cameraPermLauncher.launch(Manifest.permission.CAMERA)
+                    }
+                }
+            }
+        }
 
         // Bridge baru — diakses dari JS sebagai window.AndroidPrinter
         val bridge = WebAppInterface(webView, this)
